@@ -1,0 +1,17 @@
+# ==============================================================================
+# SESAM Explorer - Configuration Apache (.htaccess)
+# ==============================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Désactiver l'indexation des dossiers pour éviter les erreurs 403
+    Options -Indexes
+
+    # Si un fichier .html correspondant existe à la racine du site, on le sert.
+    # Cette règle fonctionne parfaitement que l'URL contienne ou non un slash final
+    # (ex: /performance ou /performance/ affichera de manière transparente performance.html)
+    RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+    RewriteRule ^([^/]+)/?$ $1.html [L]
+</IfModule>

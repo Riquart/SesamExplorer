@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SESAM Explorer - Dashboard Analytique Offline</title>
+    
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS (v3 CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- ApexCharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Data source file -->
+    <script src="data.js"></script>
+
+    <!-- Alpine.js (defer load) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.6);
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-200 antialiased font-sans" x-data="app()" x-init="init()">
+
+    <!-- Main Container -->
+    <div class="flex min-h-screen">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-[#0e1626] border-r border-gray-800/80 flex flex-col fixed h-full z-20 transition-all duration-300">
+            <div class="p-6 flex items-center gap-3 border-b border-gray-800/60">
+                <div class="p-2.5 bg-brand-600 rounded-xl shadow-lg shadow-brand-500/20">
+                    <i data-lucide="activity" class="text-white w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-1.5">
+                        SESAM <span class="text-brand-500 font-extrabold text-xs px-2 py-0.5 bg-brand-500/10 rounded-full border border-brand-500/20">Explorer</span>
+                    </h1>
+                    <span class="text-[10px] text-gray-500 block">Version Statique & Offline</span>
+                </div>
+            </div>
+
+            <!-- Nav Links -->
+            <nav class="flex-1 px-4 py-6 space-y-2">
+                <button @click="setTab('dashboard')" :class="activeTab === 'dashboard' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/15' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    Tableau de bord
+                </button>
+
+                <button @click="setTab('performance')" :class="activeTab === 'performance' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/15' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    Performances
+                </button>
+
+                <button @click="setTab('focus')" :class="activeTab === 'focus' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/15' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
+                    <i data-lucide="target" class="w-4 h-4"></i>
+                    Focus Entité
+                </button>
+
+                <button @click="setTab('compare')" :class="activeTab === 'compare' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/15' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200">
+                    <i data-lucide="trending-up" class="w-4 h-4"></i>
+                    Projections & Compare
+                </button>
+            </nav>
+
+            <!-- Bottom Stats info -->
+            <div class="p-6 border-t border-gray-800/60 bg-[#0c1220]">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span class="text-xs font-semibold text-emerald-500 uppercase tracking-wide">Base locale</span>
+                </div>
+                <p class="text-[11px] text-gray-500 leading-normal" x-text="`Total lignes : ${rawData.length.toLocaleString('fr-FR')}`"></p>
+                <div class="mt-4 pt-4 border-t border-gray-800/40 flex items-center justify-between">
+                    <span class="text-xs text-gray-400">Mode Sombre</span>
+                    <button @click="toggleDarkMode" class="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors">
+                        <i x-show="darkMode" data-lucide="moon" class="w-4 h-4"></i>
+                        <i x-show="!darkMode" data-lucide="sun" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 ml-64 min-h-screen flex flex-col bg-[#0b0f19] text-gray-200">
+            
+            <!-- Top bar -->
+            <header class="h-16 border-b border-gray-800/40 px-8 flex items-center justify-between bg-[#0b0f19]/80 backdrop-blur-md sticky top-0 z-10">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="calendar" class="text-brand-500 w-4 h-4"></i>
+                    <span class="text-xs text-gray-400 font-medium" x-text="`Dernière mise à jour des données : ${latestMonthLabel}`"></span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <span class="text-xs px-2.5 py-1 bg-brand-500/10 border border-brand-500/20 text-brand-400 font-bold rounded-lg">100% Hors-ligne</span>
+                </div>
+            </header>
+
+            <!-- Pages Contents -->
+            <div class="flex-1 p-8 max-w-7xl w-full mx-auto space-y-8">
+                
+                <!-- ================= TAB: DASHBOARD ================= -->
+                <div x-show="activeTab === 'dashboard'" x-transition:enter="transition ease-out duration-300" class="space-y-8">
+                    <!-- Title -->
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-white tracking-tight">Tableau de bord <span class="text-brand-500">SESAM</span></h2>
+                        <p class="text-gray-400 mt-1">Explorez et filtrez le parc complet de télétransmission SESAM-Vitale en temps réel.</p>
+                    </div>
+
+                    <!-- Filter Bar -->
+                    <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl space-y-6">
+                        <div class="flex items-center gap-2 pb-4 border-b border-gray-800/60">
+                            <i data-lucide="sliders" class="w-4 h-4 text-brand-500"></i>
+                            <h3 class="font-bold text-white">Filtres et périmètre d'analyse</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Profession de santé</label>
+                                <select x-model="dashFilters.profession" @change="onFiltersChanged()" class="w-full bg-[#131b2e] border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all cursor-pointer">
+                                    <option value="all">Toutes les professions</option>
+                                    <template x-for="pro in professions" :key="pro">
+                                        <option :value="pro" x-text="pro" :selected="pro === dashFilters.profession"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Filtrer par Nom d'Éditeur</label>
+                                <div class="relative">
+                                    <input type="text" x-model="dashFilters.editorName" @input.debounce.300ms="onFiltersChanged()" placeholder="Rechercher..." class="w-full bg-[#131b2e] border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-brand-500 transition-all">
+                                    <i data-lucide="search" class="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500"></i>
+                                </div>
+                            </div>
+
+                            <div class="flex items-end">
+                                <button @click="resetDashboardFilters()" class="w-full py-2.5 px-4 bg-gray-800/80 hover:bg-gray-800 text-gray-300 font-semibold rounded-xl text-sm border border-gray-700/60 hover:border-gray-600 transition-colors flex items-center justify-center gap-2">
+                                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                    Réinitialiser les filtres
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between hover:border-brand-500/30 transition-all duration-300 group">
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Professionnels Actifs (Dernier mois)</span>
+                                <h3 class="text-3xl font-extrabold text-white" x-text="dashStats.totalUsers.toLocaleString('fr-FR')"></h3>
+                                <p class="text-[11px] text-gray-500">Volume total télétransmetteur</p>
+                            </div>
+                            <div class="p-4 bg-brand-500/10 border border-brand-500/20 text-brand-500 rounded-2xl group-hover:scale-110 transition-transform">
+                                <i data-lucide="users" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between hover:border-brand-500/30 transition-all duration-300 group">
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nombre d'Éditeurs</span>
+                                <h3 class="text-3xl font-extrabold text-white" x-text="dashStats.totalEditors"></h3>
+                                <p class="text-[11px] text-gray-500">Acteurs référencés</p>
+                            </div>
+                            <div class="p-4 bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 rounded-2xl group-hover:scale-110 transition-transform">
+                                <i data-lucide="layers" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between hover:border-brand-500/30 transition-all duration-300 group">
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Progiciels Distincts</span>
+                                <h3 class="text-3xl font-extrabold text-white" x-text="dashStats.totalSolutions"></h3>
+                                <p class="text-[11px] text-gray-500">Solutions de facturation</p>
+                            </div>
+                            <div class="p-4 bg-violet-500/10 border border-violet-500/20 text-violet-500 rounded-2xl group-hover:scale-110 transition-transform">
+                                <i data-lucide="server" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <template x-if="dashHasData">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <!-- Left: Evolution Chart -->
+                            <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl lg:col-span-2 space-y-6 flex flex-col">
+                                <div class="flex items-center justify-between flex-wrap gap-4 pb-4 border-b border-gray-800/60">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="trending-up" class="w-5 h-5 text-brand-500"></i>
+                                        <h3 class="font-bold text-white text-lg" x-text="`Évolution par ${dashView === 'editeur' ? 'Éditeur' : dashView === 'groupe' ? 'Groupe' : 'Logiciel'}`"></h3>
+                                    </div>
+                                    
+                                    <!-- Controls -->
+                                    <div class="flex items-center bg-[#131b2e] rounded-xl border border-gray-800 p-0.5">
+                                        <button @click="dashTopLimit = 5; onFiltersChanged()" :class="dashTopLimit === 5 ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">Top 5</button>
+                                        <button @click="dashTopLimit = 10; onFiltersChanged()" :class="dashTopLimit === 10 ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">Top 10</button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-h-[350px]" id="dash-evolution-chart"></div>
+                            </div>
+
+                            <!-- Right: Distribution Pie Chart -->
+                            <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex flex-col space-y-6">
+                                <div class="flex items-center justify-between flex-wrap gap-4 pb-4 border-b border-gray-800/60">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="pie-chart" class="w-5 h-5 text-brand-500"></i>
+                                        <h3 class="font-bold text-white text-lg">Parts de marché</h3>
+                                    </div>
+
+                                    <!-- Switch View -->
+                                    <div class="flex items-center bg-[#131b2e] rounded-xl border border-gray-800 p-0.5">
+                                        <button @click="dashView = 'groupe'; onFiltersChanged()" :class="dashView === 'groupe' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all uppercase">Groupe</button>
+                                        <button @click="dashView = 'editeur'; onFiltersChanged()" :class="dashView === 'editeur' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all uppercase">Éditeur</button>
+                                        <button @click="dashView = 'progiciel'; onFiltersChanged()" :class="dashView === 'progiciel' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all uppercase">Logiciel</button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-h-[300px] flex items-center justify-center" id="dash-distribution-chart"></div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="!dashHasData">
+                        <div class="bg-[#0e1626] border border-gray-800/80 rounded-2xl p-20 text-center text-gray-500 flex flex-col items-center justify-center gap-4">
+                            <i data-lucide="alert-circle" class="w-12 h-12 text-gray-600"></i>
+                            <p class="text-lg font-medium">Aucune donnée ne correspond à vos filtres.</p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ================= TAB: PERFORMANCE ================= -->
+                <div x-show="activeTab === 'performance'" x-transition:enter="transition ease-out duration-300" class="space-y-8">
+                    <!-- Title -->
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div>
+                            <h2 class="text-3xl font-extrabold text-white tracking-tight">Analyse de <span class="text-brand-500">Performance</span></h2>
+                            <p class="text-gray-400 mt-1">Classements, croissances absolues et relatives des différents acteurs de télétransmission.</p>
+                        </div>
+
+                        <!-- Dropdown filters -->
+                        <div class="flex flex-wrap gap-4">
+                            <div class="w-48">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Vue</label>
+                                <select x-model="perfFilters.viewType" @change="onPerfChanged()" class="w-full bg-[#0e1626] border border-gray-800 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                    <option value="editeur">Par Éditeur</option>
+                                    <option value="groupe">Par Groupe</option>
+                                    <option value="progiciel">Par Logiciel</option>
+                                </select>
+                            </div>
+                            <div class="w-64">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Profession de santé</label>
+                                <select x-model="perfFilters.profession" @change="onPerfChanged()" class="w-full bg-[#0e1626] border border-gray-800 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                    <option value="all">Toutes les professions</option>
+                                    <template x-for="pro in professions" :key="pro">
+                                        <option :value="pro" x-text="pro" :selected="pro === perfFilters.profession"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="w-48">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Périmètre</label>
+                                <select x-model="perfFilters.limit" @change="onPerfChanged()" class="w-full bg-[#0e1626] border border-gray-800 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                    <option value="5">Top 5 (Volume)</option>
+                                    <option value="10">Top 10 (Volume)</option>
+                                    <option value="all">Tous les acteurs</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Highlight Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" x-show="perfStats.topGainer">
+                        <!-- Top Growth -->
+                        <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top Croissance (1 An)</span>
+                                <h4 class="text-lg font-bold text-white truncate max-w-[200px]" x-text="perfStats.topGainer ? perfStats.topGainer.name : ''"></h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-2xl font-extrabold text-emerald-500" x-text="`+${perfStats.topGainer ? perfStats.topGainer.delta12M.toLocaleString('fr-FR') : 0}`"></span>
+                                    <span class="text-xs font-bold text-emerald-500/80 px-2 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20" x-text="`+${perfStats.topGainer ? perfStats.topGainer.percent12M.toFixed(1) : 0}%`"></span>
+                                </div>
+                                <p class="text-[10px] text-gray-500">Meilleure progression absolue</p>
+                            </div>
+                            <div class="p-3 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-xl">
+                                <i data-lucide="trending-up" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <!-- Top Short Trend -->
+                        <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tendance Courte (1 Mois)</span>
+                                <h4 class="text-lg font-bold text-white truncate max-w-[200px]" x-text="perfStats.topGainer1M ? perfStats.topGainer1M.name : ''"></h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-2xl font-extrabold text-indigo-400" x-text="`+${perfStats.topGainer1M ? perfStats.topGainer1M.delta1M.toLocaleString('fr-FR') : 0}`"></span>
+                                    <span class="text-xs font-bold text-indigo-400/80 px-2 py-0.5 bg-indigo-500/10 rounded border border-indigo-500/20" x-text="`+${perfStats.topGainer1M ? perfStats.topGainer1M.percent1M.toFixed(1) : 0}%`"></span>
+                                </div>
+                                <p class="text-[10px] text-gray-500">Meilleure dynamique récente</p>
+                            </div>
+                            <div class="p-3 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl">
+                                <i data-lucide="zap" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <!-- Top Decline -->
+                        <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Forte Baisse (1 An)</span>
+                                <h4 class="text-lg font-bold text-white truncate max-w-[200px]" x-text="perfStats.topLoser ? perfStats.topLoser.name : ''"></h4>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-2xl font-extrabold text-rose-500" x-text="`${perfStats.topLoser ? perfStats.topLoser.delta12M.toLocaleString('fr-FR') : 0}`"></span>
+                                    <span class="text-xs font-bold text-rose-500/80 px-2 py-0.5 bg-rose-500/10 rounded border border-rose-500/20" x-text="`${perfStats.topLoser ? perfStats.topLoser.percent12M.toFixed(1) : 0}%`"></span>
+                                </div>
+                                <p class="text-[10px] text-gray-500">Perte de volume la plus importante</p>
+                            </div>
+                            <div class="p-3 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl">
+                                <i data-lucide="trending-down" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Variations Bar Chart -->
+                    <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex flex-col space-y-6">
+                        <div class="flex items-center justify-between flex-wrap gap-4 pb-4 border-b border-gray-800/60">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="bar-chart-2" class="w-5 h-5 text-brand-500"></i>
+                                <h3 class="font-bold text-white text-lg" x-text="`Variations absolues sur ${perfPeriod}`"></h3>
+                            </div>
+
+                            <!-- Period toggle -->
+                            <div class="flex items-center bg-[#131b2e] rounded-xl border border-gray-800 p-0.5">
+                                <button @click="perfPeriod = '1M'; onPerfChanged()" :class="perfPeriod === '1M' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">1 Mois</button>
+                                <button @click="perfPeriod = '6M'; onPerfChanged()" :class="perfPeriod === '6M' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">6 Mois</button>
+                                <button @click="perfPeriod = '12M'; onPerfChanged()" :class="perfPeriod === '12M' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">1 An</button>
+                            </div>
+                        </div>
+                        <div class="min-h-[350px]" id="perf-variation-chart"></div>
+                    </div>
+
+                    <!-- Detailed Table -->
+                    <div class="bg-[#0e1626] border border-gray-800/80 rounded-2xl shadow-xl overflow-hidden">
+                        <div class="p-6 border-b border-gray-800/60 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="list-ordered" class="w-5 h-5 text-brand-500"></i>
+                                <h3 class="font-bold text-white text-lg">Classement Détaillé</h3>
+                            </div>
+                            <span class="text-xs text-gray-500 font-semibold" x-text="`${perfMetrics.length} résultats`"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-gray-800/60 bg-[#0c1220]/50 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                                        <th class="py-4 px-6">Rang</th>
+                                        <th class="py-4 px-6">Nom</th>
+                                        <th class="py-4 px-6 text-right">Utilisateurs</th>
+                                        <th class="py-4 px-6 text-right">Variation 1M</th>
+                                        <th class="py-4 px-6 text-right">Variation 6M</th>
+                                        <th class="py-4 px-6 text-right font-bold text-gray-200">Variation 1 An</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(item, idx) in perfMetrics" :key="item.name">
+                                        <tr class="border-b border-gray-800/40 hover:bg-[#131b2e]/30 transition-colors text-sm text-gray-300">
+                                            <td class="py-4 px-6 font-bold text-gray-500" x-text="`#${idx + 1}`"></td>
+                                            <td class="py-4 px-6 font-semibold text-white truncate max-w-[240px]" x-text="item.name"></td>
+                                            <td class="py-4 px-6 text-right font-medium" x-text="item.currentValue.toLocaleString('fr-FR')"></td>
+                                            
+                                            <!-- 1M Delta -->
+                                            <td class="py-4 px-6 text-right">
+                                                <span :class="item.delta1M > 0 ? 'text-emerald-500' : item.delta1M < 0 ? 'text-rose-500' : 'text-gray-500'" class="font-semibold block" x-text="`${item.delta1M > 0 ? '+' : ''}${item.delta1M.toLocaleString('fr-FR')}`"></span>
+                                                <span :class="item.delta1M > 0 ? 'text-emerald-600' : item.delta1M < 0 ? 'text-rose-600' : 'text-gray-600'" class="text-[10px] block" x-text="`${item.delta1M > 0 ? '+' : ''}${item.percent1M.toFixed(1)}%`"></span>
+                                            </td>
+
+                                            <!-- 6M Delta -->
+                                            <td class="py-4 px-6 text-right">
+                                                <span :class="item.delta6M > 0 ? 'text-emerald-500' : item.delta6M < 0 ? 'text-rose-500' : 'text-gray-500'" class="font-semibold block" x-text="`${item.delta6M > 0 ? '+' : ''}${item.delta6M.toLocaleString('fr-FR')}`"></span>
+                                                <span :class="item.delta6M > 0 ? 'text-emerald-600' : item.delta6M < 0 ? 'text-rose-600' : 'text-gray-600'" class="text-[10px] block" x-text="`${item.delta6M > 0 ? '+' : ''}${item.percent6M.toFixed(1)}%`"></span>
+                                            </td>
+
+                                            <!-- 1Y Delta -->
+                                            <td class="py-4 px-6 text-right font-semibold">
+                                                <span :class="item.delta12M > 0 ? 'text-emerald-400' : item.delta12M < 0 ? 'text-rose-400' : 'text-gray-400'" class="block" x-text="`${item.delta12M > 0 ? '+' : ''}${item.delta12M.toLocaleString('fr-FR')}`"></span>
+                                                <span :class="item.delta12M > 0 ? 'text-emerald-500' : item.delta12M < 0 ? 'text-rose-500' : 'text-gray-500'" class="text-[10px] block" x-text="`${item.delta12M > 0 ? '+' : ''}${item.percent12M.toFixed(1)}%`"></span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB: FOCUS ================= -->
+                <div x-show="activeTab === 'focus'" x-transition:enter="transition ease-out duration-300" class="space-y-8">
+                    <!-- Title -->
+                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div>
+                            <h2 class="text-3xl font-extrabold text-white tracking-tight">Focus <span class="text-brand-500">Entité</span></h2>
+                            <p class="text-gray-400 mt-1">Analyse approfondie du parc de télétransmission d'un acteur spécifique.</p>
+                        </div>
+
+                        <!-- Dropdown filters -->
+                        <div class="flex flex-wrap gap-4 w-full md:w-auto">
+                            <div class="w-48">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Type</label>
+                                <select x-model="focusFilters.viewType" @change="onFocusTypeChanged()" class="w-full bg-[#0e1626] border border-gray-800 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                    <option value="editeur">Éditeur</option>
+                                    <option value="groupe">Groupe</option>
+                                    <option value="progiciel">Logiciel</option>
+                                </select>
+                            </div>
+                            <div class="w-64">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Entité</label>
+                                <select x-model="focusFilters.selectedEntity" @change="onFocusChanged()" class="w-full bg-[#0e1626] border border-gray-800 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                    <template x-for="name in focusEntities" :key="name">
+                                        <option :value="name" x-text="name" :selected="name === focusFilters.selectedEntity"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <template x-if="focusAnalysis">
+                        <div class="space-y-8">
+                            <!-- KPI Cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <!-- total users -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                                    <div class="space-y-1">
+                                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Utilisateurs</span>
+                                        <h4 class="text-2xl font-bold text-white truncate max-w-[200px]" x-text="focusAnalysis.name"></h4>
+                                        <h3 class="text-3xl font-extrabold text-white" x-text="focusAnalysis.totalUsers.toLocaleString('fr-FR')"></h3>
+                                        <p class="text-[10px] text-gray-500" x-text="`Rang #${focusAnalysis.marketRank} en volume`"></p>
+                                    </div>
+                                    <div class="p-3 bg-brand-500/10 text-brand-500 border border-brand-500/20 rounded-xl">
+                                        <i data-lucide="users" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+
+                                <!-- growth 1 year -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                                    <div class="space-y-1">
+                                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Croissance (1 An)</span>
+                                        <h4 class="text-lg font-bold text-white">Variation absolue</h4>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span :class="focusAnalysis.delta1Y >= 0 ? 'text-emerald-500' : 'text-rose-500'" class="text-2xl font-extrabold" x-text="`${focusAnalysis.delta1Y >= 0 ? '+' : ''}${focusAnalysis.delta1Y.toLocaleString('fr-FR')}`"></span>
+                                            <span :class="focusAnalysis.delta1Y >= 0 ? 'text-emerald-500/85 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-500/85 bg-rose-500/10 border-rose-500/20'" class="text-xs font-bold px-2 py-0.5 rounded border" x-text="`${focusAnalysis.delta1Y >= 0 ? '+' : ''}${focusAnalysis.percent1Y.toFixed(1)}%`"></span>
+                                        </div>
+                                        <p class="text-[10px] text-gray-500">Variation sur 12 mois</p>
+                                    </div>
+                                    <div :class="focusAnalysis.delta1Y >= 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'" class="p-3 border rounded-xl">
+                                        <i data-lucide="trending-up" class="w-6 h-6" x-show="focusAnalysis.delta1Y >= 0"></i>
+                                        <i data-lucide="trending-down" class="w-6 h-6" x-show="focusAnalysis.delta1Y < 0"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Best Profession -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                                    <div class="space-y-1">
+                                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top Profession</span>
+                                        <h4 class="text-sm font-bold text-white truncate max-w-[180px]" x-text="focusAnalysis.bestProfession.name"></h4>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-2xl font-extrabold text-emerald-500" x-text="`+${focusAnalysis.bestProfession.value.toLocaleString('fr-FR')}`"></span>
+                                        </div>
+                                        <p class="text-[10px] text-gray-500">Forte croissance absolute (12M)</p>
+                                    </div>
+                                    <div class="p-3 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-xl">
+                                        <i data-lucide="trophy" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Worst Profession -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex items-center justify-between">
+                                    <div class="space-y-1">
+                                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Point d'Attention</span>
+                                        <h4 class="text-sm font-bold text-white truncate max-w-[180px]" x-text="focusAnalysis.worstProfession.name"></h4>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-2xl font-extrabold text-rose-500" x-text="`${focusAnalysis.worstProfession.value.toLocaleString('fr-FR')}`"></span>
+                                        </div>
+                                        <p class="text-[10px] text-gray-500">Plus forte baisse absolute (12M)</p>
+                                    </div>
+                                    <div class="p-3 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl">
+                                        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Charts Grid -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <!-- Evolution Line Chart -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl col-span-1 lg:col-span-2 space-y-6 flex flex-col">
+                                    <div class="flex items-center gap-2 pb-4 border-b border-gray-800/60">
+                                        <i data-lucide="activity" class="w-5 h-5 text-brand-500"></i>
+                                        <h3 class="font-bold text-white text-lg">Évolution du parc (Historique complet)</h3>
+                                    </div>
+                                    <div class="min-h-[350px]" id="focus-evolution-chart"></div>
+                                </div>
+
+                                <!-- Profession Distribution Pie -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex flex-col space-y-6">
+                                    <div class="flex items-center gap-2 pb-4 border-b border-gray-800/60">
+                                        <i data-lucide="pie-chart" class="w-5 h-5 text-brand-500"></i>
+                                        <h3 class="font-bold text-white text-lg">Distribution des clients par Profession</h3>
+                                    </div>
+                                    <div class="flex-1 min-h-[300px] flex items-center justify-center" id="focus-prof-dist-chart"></div>
+                                </div>
+
+                                <!-- Profession Performance Bar Chart -->
+                                <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex flex-col space-y-6">
+                                    <div class="flex items-center gap-2 pb-4 border-b border-gray-800/60">
+                                        <i data-lucide="bar-chart-3" class="w-5 h-5 text-brand-500"></i>
+                                        <h3 class="font-bold text-white text-lg">Croissance sur 1 an par Profession de santé</h3>
+                                    </div>
+                                    <div class="flex-1 min-h-[300px]" id="focus-prof-perf-chart"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ================= TAB: COMPARE ================= -->
+                <div x-show="activeTab === 'compare'" x-transition:enter="transition ease-out duration-300" class="space-y-8">
+                    <!-- Title -->
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-white tracking-tight">Comparateur & <span class="text-brand-500">Projections</span></h2>
+                        <p class="text-gray-400 mt-1">Comparez deux acteurs en direct et découvrez les projections sur les 3 prochaines années (36 mois) basées sur la régression linéaire des 12 derniers mois.</p>
+                    </div>
+
+                    <!-- Selectors -->
+                    <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex flex-col md:flex-row gap-6 items-end">
+                        <div class="w-full md:w-1/3">
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Profession de santé</label>
+                            <select x-model="compFilters.profession" @change="onCompProfessionChanged()" class="w-full bg-[#131b2e] border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                <option value="all">Toutes les professions</option>
+                                <template x-for="pro in professions" :key="pro">
+                                    <option :value="pro" x-text="pro" :selected="pro === compFilters.profession"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="w-full md:w-1/3">
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Entité A (Base)</label>
+                            <select x-model="compFilters.entityA" @change="onCompChanged()" class="w-full bg-[#131b2e] border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                <template x-for="name in compEntities" :key="name">
+                                    <option :value="name" x-text="name" :selected="name === compFilters.entityA"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="w-full md:w-1/3">
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Entité B (Comparateur)</label>
+                            <select x-model="compFilters.entityB" @change="onCompChanged()" class="w-full bg-[#131b2e] border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer">
+                                <template x-for="name in compEntities" :key="name">
+                                    <option :value="name" x-text="name" :selected="name === compFilters.entityB"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="text-xs text-gray-500 italic text-center py-2 bg-brand-500/5 border border-brand-500/10 rounded-xl">
+                        💡 Les projections modélisent l'évolution linéaire future en se basant sur le rythme moyen de progression observé lors des 12 derniers mois.
+                    </div>
+
+                    <!-- Projection Chart -->
+                    <div class="bg-[#0e1626] border border-gray-800/80 p-6 rounded-2xl shadow-xl flex flex-col space-y-6">
+                        <div class="flex items-center justify-between pb-4 border-b border-gray-800/60">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="trending-up" class="w-5 h-5 text-brand-500"></i>
+                                <h3 class="font-bold text-white text-lg" x-text="`Projection : ${compFilters.entityA} vs ${compFilters.entityB}`"></h3>
+                            </div>
+                            <span class="text-xs text-brand-400 font-bold px-2 py-0.5 bg-brand-500/10 rounded border border-brand-500/20">3 Ans de Projection Statique</span>
+                        </div>
+                        <div class="min-h-[400px]" id="comp-projection-chart"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <footer class="h-16 border-t border-gray-800/40 px-8 flex items-center justify-between text-xs text-gray-500 bg-[#0e1626]/40 mt-12">
+                <p>&copy; 2026 SESAM Explorer. Conçu pour le partage local instantané.</p>
+                <div class="flex gap-4">
+                    <span class="hover:text-gray-300 transition-colors">Statique</span>
+                    <span class="text-gray-700">|</span>
+                    <span class="hover:text-gray-300 transition-colors">Offline-First</span>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        function app() {
+            return {
+                // Main state
+                activeTab: 'dashboard',
+                rawData: typeof SESAM_DATA !== 'undefined' ? SESAM_DATA : [],
+                professions: [],
+                latestMonthLabel: '',
+                darkMode: true,
+
+                // --- TAB: DASHBOARD STATE ---
+                dashFilters: {
+                    profession: 'Masseurs kinésithérapeutes',
+                    editorName: '',
+                },
+                dashView: 'editeur',
+                dashTopLimit: 5,
+                dashStats: {
+                    totalUsers: 0,
+                    totalEditors: 0,
+                    totalSolutions: 0,
+                },
+                dashHasData: true,
+
+                // --- TAB: PERFORMANCE STATE ---
+                perfFilters: {
+                    viewType: 'editeur',
+                    profession: 'all',
+                    limit: '10'
+                },
+                perfPeriod: '12M',
+                perfMetrics: [],
+                perfStats: {
+                    topGainer: null,
+                    topGainer1M: null,
+                    topLoser: null,
+                },
+
+                // --- TAB: FOCUS STATE ---
+                focusFilters: {
+                    viewType: 'editeur',
+                    selectedEntity: ''
+                },
+                focusEntities: [],
+                focusAnalysis: null,
+
+                // --- TAB: COMPARE STATE ---
+                compFilters: {
+                    profession: 'all',
+                    entityA: 'EPSILOG',
+                    entityB: 'DOCTOLIB'
+                },
+                compEntities: [],
+
+                // Init method
+                init() {
+                    if (this.rawData.length === 0) {
+                        console.error("Aucune donnée SESAM_DATA disponible dans data.js !");
+                    }
+                    
+                    // Extrait les professions uniques
+                    const pros = new Set(this.rawData.map(d => d.catPro));
+                    this.professions = Array.from(pros).sort();
+
+                    // Calcule la date la plus récente
+                    const dates = this.rawData.map(d => d.dateData);
+                    const latestDate = Math.max(...dates);
+                    this.latestMonthLabel = this.formatDateReadable(latestDate);
+
+                    // Initialise les filtres et données par défaut
+                    this.onFiltersChanged();
+
+                    // Rendu initial des icônes lucide
+                    setTimeout(() => {
+                        lucide.createIcons();
+                        this.renderDashboardCharts();
+                    }, 100);
+                },
+
+                // Change Tab helper
+                setTab(tab) {
+                    this.activeTab = tab;
+                    
+                    // Re-render charts for specific tabs
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                        if (tab === 'dashboard') {
+                            this.renderDashboardCharts();
+                        } else if (tab === 'performance') {
+                            this.onPerfChanged();
+                        } else if (tab === 'focus') {
+                            this.onFocusTypeChanged();
+                        } else if (tab === 'compare') {
+                            this.onCompProfessionChanged();
+                        }
+                    });
+                },
+
+                toggleDarkMode() {
+                    this.darkMode = !this.darkMode;
+                    if (this.darkMode) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                    // Re-render charts to adjust for dark mode colors if needed
+                    this.setTab(this.activeTab);
+                },
+
+                // --- GENERAL DATE HELPERS ---
+                formatDateReadable(dateStr) {
+                    const months = ['Janv.', 'Févr.', 'Mars', 'Avril', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
+                    const year = Math.floor(dateStr / 100);
+                    const month = (dateStr % 100) - 1;
+                    return `${months[month]} ${year}`;
+                },
+
+                // --- DASHBOARD ACTIONS & CALCULATIONS ---
+                resetDashboardFilters() {
+                    this.dashFilters.profession = 'all';
+                    this.dashFilters.editorName = '';
+                    this.onFiltersChanged();
+                },
+
+                onFiltersChanged() {
+                    // Filtrage des données
+                    const filtered = this.rawData.filter(item => {
+                        // Exclure les totaux
+                        if (item.editeur?.toLowerCase() === 'total' ||
+                            item.groupe?.toLowerCase() === 'total' ||
+                            item.progiciel?.toLowerCase() === 'total') {
+                            return false;
+                        }
+                        // Filtre profession
+                        if (this.dashFilters.profession !== 'all' && item.catPro !== this.dashFilters.profession) {
+                            return false;
+                        }
+                        // Filtre recherche nom
+                        if (this.dashFilters.editorName && !item.editeur.toLowerCase().includes(this.dashFilters.editorName.toLowerCase())) {
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    this.dashHasData = filtered.length > 0;
+                    if (!this.dashHasData) {
+                        this.dashStats = { totalUsers: 0, totalEditors: 0, totalSolutions: 0 };
+                        return;
+                    }
+
+                    // Calcul de la dernière date présente dans les données filtrées
+                    const latestDate = Math.max(...filtered.map(d => d.dateData));
+
+                    // 1. KPI : Total utilisateurs sur la dernière date
+                    const latestUsers = filtered
+                        .filter(d => d.dateData === latestDate)
+                        .reduce((acc, curr) => acc + curr.nbPsFacturation, 0);
+
+                    // 2. KPI : Éditeurs distincts
+                    const distinctEditors = new Set(filtered.map(d => d.editeur)).size;
+
+                    // 3. KPI : Progiciels distincts
+                    const distinctSolutions = new Set(filtered.map(d => d.progiciel)).size;
+
+                    this.dashStats = {
+                        totalUsers: latestUsers,
+                        totalEditors: distinctEditors,
+                        totalSolutions: distinctSolutions,
+                    };
+
+                    this.$nextTick(() => {
+                        this.renderDashboardCharts(filtered, latestDate);
+                    });
+                },
+
+                renderDashboardCharts(filteredData, latestDate) {
+                    if (this.activeTab !== 'dashboard' || !this.dashHasData) return;
+
+                    const data = filteredData || this.rawData.filter(item => {
+                        if (item.editeur?.toLowerCase() === 'total') return false;
+                        if (this.dashFilters.profession !== 'all' && item.catPro !== this.dashFilters.profession) return false;
+                        if (this.dashFilters.editorName && !item.editeur.toLowerCase().includes(this.dashFilters.editorName.toLowerCase())) return false;
+                        return true;
+                    });
+
+                    const dateLatest = latestDate || Math.max(...data.map(d => d.dateData));
+                    const key = this.dashView;
+
+                    // --- CALCULATION OF PARTS DE MARCHE (DONUT) ---
+                    const marketShares = {};
+                    data.filter(d => d.dateData === dateLatest).forEach(item => {
+                        const val = (key === 'groupe' && (!item[key] || item[key] === '__NO_GROUP__')) ? item.editeur : item[key];
+                        if (val && val.toLowerCase() !== 'total') {
+                            marketShares[val] = (marketShares[val] || 0) + item.nbPsFacturation;
+                        }
+                    });
+
+                    const sortedShares = Object.entries(marketShares)
+                        .map(([name, value]) => ({ name, value }))
+                        .sort((a, b) => b.value - a.value);
+
+                    // --- TOP N ENTITIES (FOR EVOLUTION) ---
+                    const topEntities = sortedShares.slice(0, this.dashTopLimit).map(s => s.name);
+
+                    // --- DATES ORDERED ---
+                    const uniqueDates = Array.from(new Set(data.map(d => d.dateData))).sort();
+
+                    // --- EVOLUTION DATA SERIES ---
+                    const series = topEntities.map(entity => {
+                        const entityData = uniqueDates.map(date => {
+                            const sum = data
+                                .filter(d => d.dateData === date)
+                                .reduce((acc, item) => {
+                                    const val = (key === 'groupe' && (!item[key] || item[key] === '__NO_GROUP__')) ? item.editeur : item[key];
+                                    return val === entity ? acc + item.nbPsFacturation : acc;
+                                }, 0);
+                            return sum;
+                        });
+
+                        return {
+                            name: entity,
+                            data: entityData
+                        };
+                    });
+
+                    const categories = uniqueDates.map(d => this.formatDateReadable(d));
+
+                    // Render Evolution Chart
+                    this.renderChart('dash-evolution-chart', {
+                        chart: {
+                            type: 'area',
+                            height: 350,
+                            toolbar: { show: false },
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        stroke: { curve: 'smooth', width: 3 },
+                        colors: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#f43f5e', '#a855f7', '#06b6d4'],
+                        fill: {
+                            type: 'gradient',
+                            gradient: { shadeIntensity: 1, opacityFrom: 0.25, opacityTo: 0.05 }
+                        },
+                        series: series,
+                        xaxis: {
+                            categories: categories,
+                            axisBorder: { show: false },
+                            axisTicks: { show: false },
+                        },
+                        yaxis: {
+                            labels: {
+                                formatter: val => Math.round(val).toLocaleString('fr-FR')
+                            }
+                        },
+                        grid: { borderColor: 'rgba(107, 114, 128, 0.15)', strokeDashArray: 4 },
+                        tooltip: {
+                            theme: 'dark',
+                            x: { show: true }
+                        },
+                        legend: { position: 'bottom', horizontalAlign: 'center' }
+                    });
+
+                    // Render Donut Chart
+                    const donutSeries = sortedShares.slice(0, 7).map(s => s.value);
+                    const donutLabels = sortedShares.slice(0, 7).map(s => s.name);
+                    
+                    // Rest combined into "Autres"
+                    if (sortedShares.length > 7) {
+                        const othersVal = sortedShares.slice(7).reduce((acc, curr) => acc + curr.value, 0);
+                        donutSeries.push(othersVal);
+                        donutLabels.push('Autres acteurs');
+                    }
+
+                    this.renderChart('dash-distribution-chart', {
+                        chart: {
+                            type: 'donut',
+                            height: 300,
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        stroke: { show: false },
+                        colors: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#64748b'],
+                        labels: donutLabels,
+                        series: donutSeries,
+                        plotOptions: {
+                            pie: {
+                                donut: {
+                                    size: '70%',
+                                    labels: {
+                                        show: true,
+                                        total: {
+                                            show: true,
+                                            label: 'Total',
+                                            color: '#ffffff',
+                                            formatter: w => {
+                                                return w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString('fr-FR');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        dataLabels: { enabled: false },
+                        legend: { position: 'bottom' },
+                        tooltip: { theme: 'dark' }
+                    });
+                },
+
+                // --- PERFORMANCE ACTIONS & CALCULATIONS ---
+                onPerfChanged() {
+                    const type = this.perfFilters.viewType;
+                    const prof = this.perfFilters.profession;
+
+                    // Filter based on selected profession
+                    const filtered = this.rawData.filter(d => {
+                        if (d[type]?.toLowerCase() === 'total') return false;
+                        if (prof !== 'all' && d.catPro !== prof) return false;
+                        return true;
+                    });
+
+                    if (filtered.length === 0) {
+                        this.perfMetrics = [];
+                        return;
+                    }
+
+                    // Unique dates desc
+                    const uniqueDates = Array.from(new Set(filtered.map(d => d.dateData))).sort((a, b) => b - a);
+                    const latest = uniqueDates[0];
+
+                    const findDateBack = (monthsBack) => {
+                        const year = Math.floor(latest / 100);
+                        const month = (latest % 100) - 1;
+                        const date = new Date(year, month - monthsBack, 1);
+                        const target = date.getFullYear() * 100 + (date.getMonth() + 1);
+                        return uniqueDates.find(d => d <= target) || uniqueDates[uniqueDates.length - 1];
+                    };
+
+                    const date1M = findDateBack(1);
+                    const date6M = findDateBack(6);
+                    const date12M = findDateBack(12);
+
+                    const getSnapshot = (date) => {
+                        const snap = {};
+                        filtered.filter(d => d.dateData === date).forEach(item => {
+                            const val = (type === 'groupe' && (!item[type] || item[type] === '__NO_GROUP__')) ? item.editeur : item[type];
+                            if (val && val.toLowerCase() !== 'total') {
+                                snap[val] = (snap[val] || 0) + item.nbPsFacturation;
+                            }
+                        });
+                        return snap;
+                    };
+
+                    const currentSnap = getSnapshot(latest);
+                    const snap1M = getSnapshot(date1M);
+                    const snap6M = getSnapshot(date6M);
+                    const snap12M = getSnapshot(date12M);
+
+                    // Complete Metrics list
+                    const allMetrics = Object.entries(currentSnap).map(([name, currentVal]) => {
+                        const val1M = snap1M[name] || 0;
+                        const val6M = snap6M[name] || 0;
+                        const val12M = snap12M[name] || 0;
+
+                        return {
+                            name,
+                            currentValue: currentVal,
+                            delta1M: currentVal - val1M,
+                            percent1M: val1M === 0 ? 0 : ((currentVal - val1M) / val1M) * 100,
+                            delta6M: currentVal - val6M,
+                            percent6M: val6M === 0 ? 0 : ((currentVal - val6M) / val6M) * 100,
+                            delta12M: currentVal - val12M,
+                            percent12M: val12M === 0 ? 0 : ((currentVal - val12M) / val12M) * 100,
+                        };
+                    }).sort((a, b) => b.currentValue - a.currentValue);
+
+                    // Slice metrics according to the limit
+                    const limitVal = this.perfFilters.limit;
+                    this.perfMetrics = limitVal === 'all' ? allMetrics : allMetrics.slice(0, parseInt(limitVal, 10));
+
+                    // Highlight stats (Gainers and Losers) based on top limit
+                    if (this.perfMetrics.length > 0) {
+                        const sortedBy1YGrowth = [...this.perfMetrics].sort((a, b) => b.delta12M - a.delta12M);
+                        const sortedBy1MGrowth = [...this.perfMetrics].sort((a, b) => b.delta1M - a.delta1M);
+                        
+                        this.perfStats = {
+                            topGainer: sortedBy1YGrowth[0],
+                            topGainer1M: sortedBy1MGrowth[0],
+                            topLoser: sortedBy1YGrowth[sortedBy1YGrowth.length - 1],
+                        };
+                    }
+
+                    this.$nextTick(() => {
+                        this.renderPerformanceChart();
+                    });
+                },
+
+                renderPerformanceChart() {
+                    if (this.activeTab !== 'performance' || this.perfMetrics.length === 0) return;
+
+                    const periodKeyMap = {
+                        '1M': 'delta1M',
+                        '6M': 'delta6M',
+                        '12M': 'delta12M'
+                    };
+
+                    const metricProp = periodKeyMap[this.perfPeriod];
+
+                    // Render absolute variation bar chart
+                    const chartData = this.perfMetrics.map(item => ({
+                        x: item.name,
+                        y: item[metricProp]
+                    }));
+
+                    this.renderChart('perf-variation-chart', {
+                        chart: {
+                            type: 'bar',
+                            height: 350,
+                            toolbar: { show: false },
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        plotOptions: {
+                            bar: {
+                                colors: {
+                                    ranges: [
+                                        { from: -999999, to: -1, color: '#f43f5e' }, // Rose/Red for negative
+                                        { from: 0, to: 999999, color: '#10b981' }   // Green for positive
+                                    ]
+                                },
+                                columnWidth: '55%',
+                                borderRadius: 4,
+                            }
+                        },
+                        dataLabels: { enabled: false },
+                        series: [{
+                            name: 'Variation absolue',
+                            data: chartData
+                        }],
+                        xaxis: {
+                            type: 'category',
+                            axisBorder: { show: false },
+                            axisTicks: { show: false },
+                            labels: {
+                                rotate: -45,
+                                rotateAlways: false,
+                                trim: true,
+                                maxHeight: 100,
+                            }
+                        },
+                        yaxis: {
+                            labels: {
+                                formatter: val => (val > 0 ? '+' : '') + Math.round(val).toLocaleString('fr-FR')
+                            }
+                        },
+                        grid: { borderColor: 'rgba(107, 114, 128, 0.15)', strokeDashArray: 4 },
+                        tooltip: { theme: 'dark' }
+                    });
+                },
+
+                // --- FOCUS ACTIONS & CALCULATIONS ---
+                onFocusTypeChanged() {
+                    const type = this.focusFilters.viewType;
+                    const items = this.rawData.filter(d => {
+                        if (d[type]?.toLowerCase() === 'total') return false;
+                        return true;
+                    });
+
+                    // Build unique list of entities of this type
+                    const marketShares = {};
+                    const latestDate = Math.max(...items.map(d => d.dateData));
+                    
+                    items.filter(d => d.dateData === latestDate).forEach(item => {
+                        const val = (type === 'groupe' && (!item[type] || item[type] === '__NO_GROUP__')) ? item.editeur : item[type];
+                        if (val && val.toLowerCase() !== 'total') {
+                            marketShares[val] = (marketShares[val] || 0) + item.nbPsFacturation;
+                        }
+                    });
+
+                    this.focusEntities = Object.keys(marketShares).sort();
+
+                    // Default selection
+                    if (this.focusEntities.length > 0) {
+                        this.focusFilters.selectedEntity = this.focusEntities[0];
+                        this.onFocusChanged();
+                    }
+                },
+
+                onFocusChanged() {
+                    const name = this.focusFilters.selectedEntity;
+                    const type = this.focusFilters.viewType;
+                    
+                    if (!name) return;
+
+                    const entityData = this.rawData.filter(d => {
+                        const val = (type === 'groupe' && (!d[type] || d[type] === '__NO_GROUP__')) ? d.editeur : d[type];
+                        return val === name;
+                    });
+
+                    if (entityData.length === 0) {
+                        this.focusAnalysis = null;
+                        return;
+                    }
+
+                    // Calculations
+                    const uniqueDates = Array.from(new Set(this.rawData.map(d => d.dateData))).sort((a, b) => b - a);
+                    const latestDate = uniqueDates[0];
+                    const prevYearDate = uniqueDates.find(d => {
+                        const y = Math.floor(latestDate / 100);
+                        const m = latestDate % 100;
+                        const target = (y - 1) * 100 + m;
+                        return d <= target;
+                    }) || uniqueDates[uniqueDates.length - 1];
+
+                    // Total users
+                    const currentTotal = entityData
+                        .filter(d => d.dateData === latestDate)
+                        .reduce((sum, d) => sum + d.nbPsFacturation, 0);
+
+                    const prevYearTotal = entityData
+                        .filter(d => d.dateData === prevYearDate)
+                        .reduce((sum, d) => sum + d.nbPsFacturation, 0);
+
+                    const delta1Y = currentTotal - prevYearTotal;
+                    const percent1Y = prevYearTotal === 0 ? 0 : (delta1Y / prevYearTotal) * 100;
+
+                    // Rank calculation
+                    const typeShares = {};
+                    this.rawData.filter(d => d.dateData === latestDate).forEach(item => {
+                        const val = (type === 'groupe' && (!item[type] || item[type] === '__NO_GROUP__')) ? item.editeur : item[type];
+                        if (val && val.toLowerCase() !== 'total') {
+                            typeShares[val] = (typeShares[val] || 0) + item.nbPsFacturation;
+                        }
+                    });
+                    const sortedShares = Object.entries(typeShares).sort((a, b) => b[1] - a[1]);
+                    const rank = sortedShares.findIndex(s => s[0] === name) + 1;
+
+                    // Profession Distribution (latest date)
+                    const distMap = {};
+                    entityData.filter(d => d.dateData === latestDate).forEach(d => {
+                        distMap[d.catPro] = (distMap[d.catPro] || 0) + d.nbPsFacturation;
+                    });
+                    const professionDistribution = Object.entries(distMap)
+                        .map(([name, value]) => ({
+                            name,
+                            value,
+                            percent: currentTotal === 0 ? 0 : (value / currentTotal) * 100
+                        }))
+                        .sort((a, b) => b.value - a.value);
+
+                    // Profession Growth/Performance (1 year)
+                    const prevDistMap = {};
+                    entityData.filter(d => d.dateData === prevYearDate).forEach(d => {
+                        prevDistMap[d.catPro] = (prevDistMap[d.catPro] || 0) + d.nbPsFacturation;
+                    });
+
+                    const professionPerformance = Object.keys({...distMap, ...prevDistMap}).map(pro => {
+                        const cur = distMap[pro] || 0;
+                        const prev = prevDistMap[pro] || 0;
+                        const diff = cur - prev;
+                        return {
+                            name: pro,
+                            currentValue: cur,
+                            delta12M: diff,
+                            percent12M: prev === 0 ? 0 : (diff / prev) * 100
+                        };
+                    }).sort((a, b) => b.delta12M - a.delta12M);
+
+                    const bestProfession = professionPerformance[0] || { name: 'N/A', delta12M: 0 };
+                    const worstProfession = professionPerformance[professionPerformance.length - 1] || { name: 'N/A', delta12M: 0 };
+
+                    // Evolution historical timeline
+                    const evolutionMap = {};
+                    entityData.forEach(d => {
+                        const dateStr = String(d.dateData);
+                        evolutionMap[dateStr] = (evolutionMap[dateStr] || 0) + d.nbPsFacturation;
+                    });
+                    const globalEvolution = Object.entries(evolutionMap)
+                        .map(([date, value]) => ({
+                            date: parseInt(date, 10),
+                            dateLabel: this.formatDateReadable(date),
+                            value
+                        }))
+                        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+                    this.focusAnalysis = {
+                        name,
+                        type,
+                        totalUsers: currentTotal,
+                        marketRank: rank,
+                        delta1Y,
+                        percent1Y,
+                        bestProfession: { name: bestProfession.name, value: bestProfession.delta12M },
+                        worstProfession: { name: worstProfession.name, value: worstProfession.delta12M },
+                        professionDistribution,
+                        professionPerformance,
+                        globalEvolution
+                    };
+
+                    this.$nextTick(() => {
+                        this.renderFocusCharts();
+                    });
+                },
+
+                renderFocusCharts() {
+                    if (this.activeTab !== 'focus' || !this.focusAnalysis) return;
+
+                    const analysis = this.focusAnalysis;
+
+                    // 1. Evolution historical area chart
+                    const dates = analysis.globalEvolution.map(d => d.dateLabel);
+                    const values = analysis.globalEvolution.map(d => d.value);
+
+                    this.renderChart('focus-evolution-chart', {
+                        chart: {
+                            type: 'area',
+                            height: 350,
+                            toolbar: { show: false },
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        stroke: { curve: 'smooth', width: 3 },
+                        colors: ['#6366f1'],
+                        fill: {
+                            type: 'gradient',
+                            gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.05 }
+                        },
+                        series: [{
+                            name: 'Utilisateurs',
+                            data: values
+                        }],
+                        xaxis: {
+                            categories: dates,
+                            axisBorder: { show: false },
+                            axisTicks: { show: false },
+                        },
+                        yaxis: {
+                            labels: {
+                                formatter: val => Math.round(val).toLocaleString('fr-FR')
+                            }
+                        },
+                        grid: { borderColor: 'rgba(107, 114, 128, 0.15)', strokeDashArray: 4 },
+                        tooltip: { theme: 'dark' }
+                    });
+
+                    // 2. Profession distribution donut
+                    const pieSeries = analysis.professionDistribution.slice(0, 5).map(p => p.value);
+                    const pieLabels = analysis.professionDistribution.slice(0, 5).map(p => p.name);
+
+                    if (analysis.professionDistribution.length > 5) {
+                        const othersVal = analysis.professionDistribution.slice(5).reduce((acc, curr) => acc + curr.value, 0);
+                        pieSeries.push(othersVal);
+                        pieLabels.push('Autres professions');
+                    }
+
+                    this.renderChart('focus-prof-dist-chart', {
+                        chart: {
+                            type: 'donut',
+                            height: 300,
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        stroke: { show: false },
+                        colors: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#64748b'],
+                        labels: pieLabels,
+                        series: pieSeries,
+                        plotOptions: {
+                            pie: {
+                                donut: {
+                                    size: '70%',
+                                    labels: {
+                                        show: true,
+                                        total: {
+                                            show: true,
+                                            label: 'Total',
+                                            color: '#ffffff',
+                                            formatter: w => {
+                                                return w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString('fr-FR');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        dataLabels: { enabled: false },
+                        legend: { position: 'bottom' },
+                        tooltip: { theme: 'dark' }
+                    });
+
+                    // 3. Profession performance (Bar chart)
+                    const perfBarData = analysis.professionPerformance.map(p => ({
+                        x: p.name,
+                        y: p.delta12M
+                    }));
+
+                    this.renderChart('focus-prof-perf-chart', {
+                        chart: {
+                            type: 'bar',
+                            height: 300,
+                            toolbar: { show: false },
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        plotOptions: {
+                            bar: {
+                                colors: {
+                                    ranges: [
+                                        { from: -999999, to: -1, color: '#f43f5e' },
+                                        { from: 0, to: 999999, color: '#10b981' }
+                                    ]
+                                },
+                                borderRadius: 4,
+                            }
+                        },
+                        dataLabels: { enabled: false },
+                        series: [{
+                            name: 'Variation 1 An',
+                            data: perfBarData
+                        }],
+                        xaxis: {
+                            type: 'category',
+                            labels: {
+                                rotate: -45,
+                                trim: true,
+                            }
+                        },
+                        yaxis: {
+                            labels: {
+                                formatter: val => (val > 0 ? '+' : '') + Math.round(val).toLocaleString('fr-FR')
+                            }
+                        },
+                        grid: { borderColor: 'rgba(107, 114, 128, 0.15)', strokeDashArray: 4 },
+                        tooltip: { theme: 'dark' }
+                    });
+                },
+
+                // --- COMPARE ACTIONS, REGRESSION & PROJECTIONS ---
+                onCompProfessionChanged() {
+                    const prof = this.compFilters.profession;
+                    const filtered = this.rawData.filter(d => {
+                        if (d.editeur?.toLowerCase() === 'total') return false;
+                        if (prof !== 'all' && d.catPro !== prof) return false;
+                        return true;
+                    });
+
+                    const uniqueEditors = new Set(filtered.map(d => d.editeur));
+                    this.compEntities = Array.from(uniqueEditors).sort();
+
+                    // Fallbacks
+                    if (this.compEntities.length > 0) {
+                        this.compFilters.entityA = this.compEntities.includes('EPSILOG') ? 'EPSILOG' : this.compEntities[0];
+                        this.compFilters.entityB = this.compEntities.includes('DOCTOLIB') ? 'DOCTOLIB' : (this.compEntities[1] || this.compEntities[0]);
+                        this.onCompChanged();
+                    }
+                },
+
+                onCompChanged() {
+                    this.$nextTick(() => {
+                        this.renderCompChart();
+                    });
+                },
+
+                calculateLinearRegression(x, y) {
+                    const n = x.length;
+                    if (n < 2) return { slope: 0, intercept: y[0] || 0 };
+
+                    const sumX = x.reduce((a, b) => a + b, 0);
+                    const sumY = y.reduce((a, b) => a + b, 0);
+                    const sumXY = x.reduce((acc, curr, i) => acc + curr * y[i], 0);
+                    const sumXX = x.reduce((acc, curr) => acc + curr * curr, 0);
+
+                    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+                    const intercept = (sumY - slope * sumX) / n;
+
+                    return { slope, intercept };
+                },
+
+                renderCompChart() {
+                    if (this.activeTab !== 'compare') return;
+
+                    const prof = this.compFilters.profession;
+                    const entA = this.compFilters.entityA;
+                    const entB = this.compFilters.entityB;
+
+                    if (!entA || !entB) return;
+
+                    const getHistory = (entityName) => {
+                        const filtered = this.rawData.filter(item => {
+                            if (prof !== 'all' && item.catPro !== prof) return false;
+                            return item.editeur === entityName;
+                        });
+
+                        const groupedMap = {};
+                        filtered.forEach(d => {
+                            const dateStr = String(d.dateData);
+                            groupedMap[dateStr] = (groupedMap[dateStr] || 0) + d.nbPsFacturation;
+                        });
+
+                        return Object.entries(groupedMap)
+                            .map(([date, value]) => ({ date: parseInt(date, 10), value }))
+                            .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                    };
+
+                    const histA = getHistory(entA);
+                    const histB = getHistory(entB);
+
+                    if (histA.length === 0 || histB.length === 0) return;
+
+                    // Unique historical timeline
+                    const allDates = Array.from(new Set([...histA.map(h => h.date), ...histB.map(h => h.date)])).sort();
+                    
+                    // Linear Regression over last 12 months
+                    const LOOKBACK = 12;
+
+                    const getRegressionParams = (history) => {
+                        const len = history.length;
+                        const slice = history.slice(-LOOKBACK);
+                        const x = Array.from({ length: slice.length }, (_, i) => i);
+                        const y = slice.map(h => h.value);
+                        return this.calculateLinearRegression(x, y);
+                    };
+
+                    const paramsA = getRegressionParams(histA);
+                    const paramsB = getRegressionParams(histB);
+
+                    // Generate Projection Months (36 months)
+                    const PROJ_MONTHS = 36;
+                    const lastDate = allDates[allDates.length - 1];
+
+                    const addMonths = (yyyymm, offset) => {
+                        const year = Math.floor(yyyymm / 100);
+                        const month = (yyyymm % 100) - 1;
+                        const date = new Date(year, month + offset, 1);
+                        return date.getFullYear() * 100 + (date.getMonth() + 1);
+                    };
+
+                    const projDates = [];
+                    for (let i = 1; i <= PROJ_MONTHS; i++) {
+                        projDates.push(addMonths(lastDate, i));
+                    }
+
+                    // Build unified categories (labels)
+                    const categories = [...allDates, ...projDates].map(d => this.formatDateReadable(d));
+                    const boundaryIdx = allDates.length - 1; // Last index of history
+
+                    // Build series
+                    // ApexCharts requires parallel arrays. To distinguish dashed projection, we can construct:
+                    // 1. History A (solid) -> holds history, rest null
+                    // 2. Proj A (dashed) -> holds null for history (except the boundary index to connect), and projected values
+                    // 3. History B (solid) -> holds history, rest null
+                    // 4. Proj B (dashed) -> holds null for history, and projected values
+                    
+                    const histSeriesA = categories.map((_, idx) => {
+                        if (idx <= boundaryIdx) {
+                            const dateVal = allDates[idx];
+                            const found = histA.find(h => h.date === dateVal);
+                            return found ? found.value : 0;
+                        }
+                        return null;
+                    });
+
+                    const projSeriesA = categories.map((_, idx) => {
+                        if (idx < boundaryIdx) return null;
+                        if (idx === boundaryIdx) return histSeriesA[boundaryIdx];
+                        
+                        const steps = idx - boundaryIdx;
+                        const startVal = histSeriesA[boundaryIdx];
+                        const projected = startVal + (paramsA.slope * steps);
+                        return Math.max(0, Math.round(projected));
+                    });
+
+                    const histSeriesB = categories.map((_, idx) => {
+                        if (idx <= boundaryIdx) {
+                            const dateVal = allDates[idx];
+                            const found = histB.find(h => h.date === dateVal);
+                            return found ? found.value : 0;
+                        }
+                        return null;
+                    });
+
+                    const projSeriesB = categories.map((_, idx) => {
+                        if (idx < boundaryIdx) return null;
+                        if (idx === boundaryIdx) return histSeriesB[boundaryIdx];
+                        
+                        const steps = idx - boundaryIdx;
+                        const startVal = histSeriesB[boundaryIdx];
+                        const projected = startVal + (paramsB.slope * steps);
+                        return Math.max(0, Math.round(projected));
+                    });
+
+                    this.renderChart('comp-projection-chart', {
+                        chart: {
+                            type: 'line',
+                            height: 400,
+                            toolbar: { show: false },
+                            background: 'transparent',
+                            foreColor: '#6B7280'
+                        },
+                        stroke: {
+                            curve: 'smooth',
+                            width: [3, 3, 3, 3],
+                            dashArray: [0, 5, 0, 5] // Dashed for projections (series index 1 and 3)
+                        },
+                        colors: ['#6366f1', '#6366f1', '#10b981', '#10b981'], // Matching colors for A and B
+                        series: [
+                            { name: `${entA} (Historique)`, data: histSeriesA },
+                            { name: `${entA} (Projection)`, data: projSeriesA },
+                            { name: `${entB} (Historique)`, data: histSeriesB },
+                            { name: `${entB} (Projection)`, data: projSeriesB }
+                        ],
+                        xaxis: {
+                            categories: categories,
+                            axisBorder: { show: false },
+                            axisTicks: { show: false },
+                            tickAmount: 10,
+                        },
+                        yaxis: {
+                            labels: {
+                                formatter: val => Math.round(val).toLocaleString('fr-FR')
+                            }
+                        },
+                        grid: { borderColor: 'rgba(107, 114, 128, 0.15)', strokeDashArray: 4 },
+                        tooltip: { theme: 'dark' },
+                        legend: { position: 'bottom' }
+                    });
+                },
+
+                // Centralized ApexCharts renderer
+                renderChart(elementId, options) {
+                    if (!window.charts) window.charts = {};
+                    
+                    if (window.charts[elementId]) {
+                        window.charts[elementId].destroy();
+                    }
+
+                    const el = document.getElementById(elementId);
+                    if (el) {
+                        const chart = new ApexCharts(el, options);
+                        chart.render();
+                        window.charts[elementId] = chart;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
